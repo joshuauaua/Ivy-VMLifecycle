@@ -20,9 +20,10 @@ public class HomeApp : ViewBase
 
     // VM Filters
     var vmSearch = UseState("");
+    var selectedVMs = UseState(new List<string>());
+    var snapshotVM = UseState<VirtualMachine?>(() => null);
 
     object DashboardSection() => Layout.Vertical().Gap(4)
-        | Text.Label("Dashboard Overview")
         | Layout.Horizontal().Gap(4)
             | new Card(Layout.Vertical().Center() | Text.H3("5") | Text.P("Active VMs"))
             | new Card(Layout.Vertical().Center() | Text.H3("12") | Text.P("Snapshots"))
@@ -36,9 +37,12 @@ public class HomeApp : ViewBase
                 | new TextInput(vmSearch, "Search VMs...").Variant(TextInputs.Search).Width(300)
         ),
         Layout.Vertical().Gap(4)
-            | Text.P("Manage your virtual instances and perform lifecycle actions.")
             | UseService<IVMService>().GetVMsAsync().Result.ToTable()
                 .Width(Size.Full())
+                .Header(v => v.Id, "")
+                .Builder(v => v.Id, f => f.Func<VirtualMachine, Guid>(id =>
+                    selectedVMs.ToSelectInput(new[] { id.ToString() }.ToOptions())
+                        .Variant(SelectInputs.List)))
                 .Header(v => v.Name, "VM Name")
                 .Header(v => v.Provider, "Provider")
                 .Header(v => v.Status, "Status")
@@ -47,6 +51,16 @@ public class HomeApp : ViewBase
                     : new Badge("Stopped").Destructive()))
                 .Header(v => v.DisplayTags, "Tags")
                 .Header(v => v.LastAction, "Last Action")
+                .Header(v => v.Self, "Actions")
+                .Builder(v => v.Self, f => f.Func<VirtualMachine, VirtualMachine>(vm =>
+                    Layout.Horizontal().Gap(2)
+                        | new Button("").Icon(Icons.Camera).Variant(ButtonVariant.Ghost).HandleClick(_ => snapshotVM.Value = vm)
+                        | (vm.Status == VMStatus.Running
+                            ? (Layout.Horizontal().Gap(2)
+                                | new Button("").Icon(Icons.CircleStop).Variant(ButtonVariant.Ghost)
+                                | new Button("").Icon(Icons.RefreshCw).Variant(ButtonVariant.Ghost))
+                            : new Button("").Icon(Icons.Play).Variant(ButtonVariant.Ghost))
+                ))
                 .Align(v => v.Name, Align.Left)
                 .Align(v => v.Status, Align.Center)
     );
@@ -60,8 +74,6 @@ public class HomeApp : ViewBase
                 | new Field(new DateTimeInput<DateTime?>(filterEnd), "End Date")
         ),
         Layout.Vertical().Gap(4)
-            | Text.Label("Audit Logs")
-            | Text.P("Track system actions and user activities.")
             | UseService<IVMService>().GetAuditLogsAsync().Result.ToTable()
                 .Width(Size.Full())
                 .Header(l => l.User, "User")
@@ -71,15 +83,37 @@ public class HomeApp : ViewBase
                 .Align(l => l.Action, Align.Center)
     );
 
+    object SnapshotSection(VirtualMachine vm) => new HeaderLayout(
+        Layout.Vertical().Gap(2)
+            | new Button("Back").Icon(Icons.ArrowLeft).Variant(ButtonVariant.Ghost).HandleClick(_ => snapshotVM.Value = null)
+            | Layout.Horizontal().Gap(4).Center()
+                | Text.H3($"Snapshots for {vm.Name}")
+                | new Spacer()
+                | new Button("Create Snapshot").Icon(Icons.Camera).Variant(ButtonVariant.Primary)
+        ,
+        Layout.Vertical().Gap(4)
+            | UseService<IVMService>().GetSnapshotsAsync(vm.Id).Result.ToTable()
+                .Width(Size.Full())
+                .Header(s => s.Name, "Snapshot Name")
+                .Header(s => s.CreatedAt, "Created At")
+                .Header(s => s.Id, "Actions")
+                .Builder(s => s.Id, f => f.Func<Snapshot, Guid>(id =>
+                    Layout.Horizontal().Gap(2)
+                        | new Button("").Icon(Icons.RefreshCw).Variant(ButtonVariant.Ghost)
+                        | new Button("").Icon(Icons.Trash2).Variant(ButtonVariant.Ghost)
+                ))
+    );
+
     var navHeader = new Card(
-        Layout.Horizontal().Center().Padding(0, 4)
+        Layout.Horizontal().Gap(3).Center()
+            | Text.H5("Ivy VM Lifecycle")
             | new TabsLayout(e => selectedIndex.Value = e.Value, null, null, null, selectedIndex.Value,
                   new Tab("Dashboard").Icon(Icons.LayoutDashboard),
                   new Tab("Virtual Machines").Icon(Icons.Monitor),
                   new Tab("Audit Logs").Icon(Icons.List),
                   new Tab("Settings").Icon(Icons.Settings)
               )
-              .Variant(TabsVariant.Tabs)
+              .Variant(TabsVariant.Content)
               .Padding(0)
               .Width(Size.Shrink())
             | new Spacer()
@@ -94,6 +128,8 @@ public class HomeApp : ViewBase
 
     object GetSectionContent()
     {
+      if (snapshotVM.Value != null) return SnapshotSection(snapshotVM.Value);
+
       return selectedIndex.Value switch
       {
         0 => DashboardSection(),
@@ -104,7 +140,9 @@ public class HomeApp : ViewBase
       };
     }
 
-    return new HeaderLayout(navHeader, GetSectionContent());
+    return Layout.Vertical().Gap(2)
+        | navHeader
+        | GetSectionContent();
   }
 }
 

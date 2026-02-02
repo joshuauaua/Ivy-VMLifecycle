@@ -7,6 +7,7 @@ public interface IVMService
 {
   Task<List<VirtualMachine>> GetVMsAsync();
   Task<List<AuditLog>> GetAuditLogsAsync();
+  Task<List<Snapshot>> GetSnapshotsAsync(Guid vmId);
 }
 
 public class VMService : IVMService
@@ -54,5 +55,16 @@ public class VMService : IVMService
                 new AuditLog {Id = Guid.NewGuid(), User = "system", Action = AuditAction.SnapshotCreate, StartDate = DateTime.Now.AddMinutes(-10), EndDate = DateTime.Now.AddMinutes(-10)}
             };
     }
+  }
+
+  public async Task<List<Snapshot>> GetSnapshotsAsync(Guid vmId)
+  {
+    // Return mock snapshots
+    return new List<Snapshot>
+    {
+      new Snapshot { Id = Guid.NewGuid(), Name = "Initial Backup", CreatedAt = DateTime.Now.AddDays(-2) },
+      new Snapshot { Id = Guid.NewGuid(), Name = "Post-Config", CreatedAt = DateTime.Now.AddDays(-1) },
+      new Snapshot { Id = Guid.NewGuid(), Name = "Daily-Snap-01", CreatedAt = DateTime.Now.AddHours(-5) }
+    };
   }
 }
