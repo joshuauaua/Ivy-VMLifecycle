@@ -1,0 +1,6 @@
+@Ivy.VMLifecycle.Api_HostAddress = http://localhost:5238
+
+GET {{Ivy.VMLifecycle.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
